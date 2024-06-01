@@ -22,7 +22,9 @@ class PositionalEmbedding(nn.Module):
         self.register_buffer('pe', pe)
 
     def forward(self, x):
-        return self.pe[:, :x.size(1)]
+        y = x
+        z = self.pe[:, :x.size(1)]
+        return z
 
 
 class TokenEmbedding(nn.Module):
@@ -36,8 +38,9 @@ class TokenEmbedding(nn.Module):
                 nn.init.kaiming_normal_(m.weight, mode='fan_in', nonlinearity='leaky_relu')
 
     def forward(self, x):
+        y = x
         x = self.tokenConv(x.permute(0, 2, 1)).transpose(1, 2)
-        return x
+        return x #[16,96,512]
 
 
 class FixedEmbedding(nn.Module):
@@ -86,6 +89,7 @@ class TemporalEmbedding(nn.Module):
         weekday_x = self.weekday_embed(x[:, :, 2])
         day_x = self.day_embed(x[:, :, 1])
         month_x = self.month_embed(x[:, :, 0])
+        shape = hour_x + weekday_x + day_x + month_x + minute_x
 
         return hour_x + weekday_x + day_x + month_x + minute_x
 
@@ -97,7 +101,7 @@ class TimeFeatureEmbedding(nn.Module):
         freq_map = {'h': 4, 't': 5, 's': 6, 'm': 1, 'a': 1, 'w': 2, 'd': 3, 'b': 3}
         d_inp = freq_map[freq]
         self.embed = nn.Linear(d_inp, d_model, bias=False)
-
+    #input 16,96,4
     def forward(self, x):
         return self.embed(x)
 
@@ -112,9 +116,23 @@ class DataEmbedding(nn.Module):
                                                     freq=freq) if embed_type != 'timeF' else TimeFeatureEmbedding(
             d_model=d_model, embed_type=embed_type, freq=freq)
         self.dropout = nn.Dropout(p=dropout)
-
+    #input x=16,96,21
     def forward(self, x, x_mark):
-        x = self.value_embedding(x) + self.temporal_embedding(x_mark) + self.position_embedding(x)
+        print("x.shape=",x.shape)#16,96,21
+        print("x_mark.shape=",x_mark.shape)#16,96,4
+        a = self.value_embedding(x)
+        print("a.shape=",a.shape)
+        b = self.temporal_embedding(x_mark)
+        print("b.shape=",b.shape)
+        c = self.position_embedding(x)
+        print("c.shape=",c.shape)
+
+        x = a+b+c
+        # x.shape = torch.Size([16, 96, 21])
+        # x_mark.shape = torch.Size([16, 96, 4])
+        # value_embedding.shape = torch.Size([16, 96, 512])
+        # temporal_embedding.shape = torch.Size([16, 96, 512])
+        # position_embedding.shape = torch.Size([1, 96, 512])
         return self.dropout(x)
 
 
