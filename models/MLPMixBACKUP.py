@@ -127,7 +127,7 @@ if __name__ == "__main__":
     print(m)
     print(global_pooling(z).shape)
     print(torch.ones(1,2))
-    model = MLPMixer(image_size=224, channels=3, patch_size=16, dim=512, depth=2, num_classes=1000, expansion_factor=4,
+    model = MLPMixer(image_size=224, channels=3, patch_size=16, dim=512, depth=1, num_classes=1000, expansion_factor=4,
              expansion_factor_token=0.5, dropout=0.)
     # model = MLPMixer(in_channels=3, image_size=224, patch_size=16, num_classes=1000,
     #                  dim=512, depth=8, token_dim=256, channel_dim=2048)

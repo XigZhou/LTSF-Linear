@@ -60,7 +60,6 @@ class Dataset_ETT_hour(Dataset):
             train_data = df_data[border1s[0]:border2s[0]]
             self.scaler.fit(train_data.values)
             data = self.scaler.transform(df_data.values)
-            # data = df_data.values
         else:
             data = df_data.values
 
@@ -83,10 +82,8 @@ class Dataset_ETT_hour(Dataset):
     def __getitem__(self, index):
         s_begin = index
         s_end = s_begin + self.seq_len
-        # r_begin = s_end - self.label_len
-        # r_end = r_begin + self.label_len + self.pred_len
-        r_begin = s_end
-        r_end = r_begin + self.pred_len
+        r_begin = s_end - self.label_len
+        r_end = r_begin + self.label_len + self.pred_len
 
         seq_x = self.data_x[s_begin:s_end]
         seq_y = self.data_y[r_begin:r_end]
@@ -148,10 +145,9 @@ class Dataset_ETT_minute(Dataset):
             df_data = df_raw[[self.target]]
 
         if self.scale:
-            # train_data = df_data[border1s[0]:border2s[0]]
-            # self.scaler.fit(train_data.values)
-            # data = self.scaler.transform(df_data.values)
-            data = df_data.values
+            train_data = df_data[border1s[0]:border2s[0]]
+            self.scaler.fit(train_data.values)
+            data = self.scaler.transform(df_data.values)
         else:
             data = df_data.values
 
@@ -176,8 +172,6 @@ class Dataset_ETT_minute(Dataset):
     def __getitem__(self, index):
         s_begin = index
         s_end = s_begin + self.seq_len
-        # r_begin = s_end - self.label_len
-        # r_end = r_begin + self.label_len + self.pred_len
         r_begin = s_end - self.label_len
         r_end = r_begin + self.label_len + self.pred_len
 

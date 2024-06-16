@@ -1,9 +1,14 @@
 import argparse
 import os
 import torch
-from exp.exp_main import Exp_Main
+
+
+
 import random
 import numpy as np
+
+from exp.exp_TimeMLPMixer import exp_TimeMLPMixer
+
 
 def main():
     fix_seed = 2021
@@ -16,9 +21,9 @@ def main():
     # basic config
     parser.add_argument('--is_training', type=int, required=False, default=1, help='status')
     parser.add_argument('--train_only', type=bool, required=False, default=False, help='perform training on full input dataset without validation and testing')
-    parser.add_argument('--model_id', type=str, required=False, default='ETTh1_91', help='model id')
-    parser.add_argument('--model', type=str, required=False, default='DLinear',
-                        help='model name, options: [Autoformer, Informer, Transformer]')
+    parser.add_argument('--model_id', type=str, required=False, default='ETTh1_96', help='model id')
+    parser.add_argument('--model', type=str, required=False, default='MLPMixer',
+                        help='model name, options: [Autoformer, Informer, Transformer,DLinear,MLPMixer]')
 
     # data loader
     parser.add_argument('--data', type=str, required=False, default='ETTh1', help='dataset type')
@@ -32,10 +37,29 @@ def main():
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
 
     # forecasting task
-    parser.add_argument('--seq_len', type=int, default=91, help='input sequence length')
+    parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
     parser.add_argument('--label_len', type=int, default=48, help='start token length')
-    parser.add_argument('--pred_len', type=int, default=91, help='prediction sequence length')
+    parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
 
+
+
+    # MLPMixer
+    parser.add_argument('--look_back_windows', type=int, default=96,
+                        help='0: default 1: value embedding + temporal embedding + positional embedding 2: value embedding + temporal embedding 3: value embedding + positional embedding 4: value embedding')
+    parser.add_argument('--channels', type=int, default=3,
+                        help='encoder input size')  # DLinear with --individual, use this hyperparameter as the number of channels
+    parser.add_argument('--number_of_values', type=int, default=7, help='decoder input size')
+    parser.add_argument('--dim', type=int, default=256, help='output size')
+    parser.add_argument('--split_len', type=int, default=6, help='output size')
+    parser.add_argument('--depth', type=int, default=4, help='dimension of model')
+    parser.add_argument('--predict_len', type=int, default=96, help='output size')
+    parser.add_argument('--expansion_factor', type=int, default=4, help='dimension of model')
+    parser.add_argument('--expansion_factor_token', type=int, default=2, help='output size')
+    parser.add_argument('--use_norm', type=int, default=True, help='use norm and denorm')
+
+    # TimeMLPMixer(look_back_windows=91, channels=3, number_of_values=7, dim=128, depth=1, predict_len=7 * 7,
+    #              expansion_factor=4,
+    #              # #              expansion_factor_token=0.5, dropout=0.)
 
     # DLinear
     parser.add_argument('--individual', action='store_true', default=False, help='DLinear: a linear layer for each variate(channel) individually')
@@ -93,7 +117,7 @@ def main():
     print('Args in experiment:')
     print(args)
 
-    Exp = Exp_Main
+    Exp = exp_TimeMLPMixer
 
     if args.is_training:
         for ii in range(args.itr):
@@ -122,11 +146,11 @@ def main():
 
             if not args.train_only:
                 print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-                exp.test(setting)
+                # exp.test(setting)
 
             if args.do_predict:
                 print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-                exp.predict(setting, True)
+                # exp.predict(setting, True)
 
             torch.cuda.empty_cache()
     else:
