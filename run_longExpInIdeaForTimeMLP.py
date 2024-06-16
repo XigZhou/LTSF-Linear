@@ -51,7 +51,7 @@ def main():
     parser.add_argument('--number_of_values', type=int, default=7, help='decoder input size')
     parser.add_argument('--dim', type=int, default=256, help='output size')
     parser.add_argument('--split_len', type=int, default=6, help='output size')
-    parser.add_argument('--depth', type=int, default=4, help='dimension of model')
+    parser.add_argument('--depth', type=int, default=2, help='dimension of model')
     parser.add_argument('--predict_len', type=int, default=96, help='output size')
     parser.add_argument('--expansion_factor', type=int, default=4, help='dimension of model')
     parser.add_argument('--expansion_factor_token', type=int, default=2, help='output size')
