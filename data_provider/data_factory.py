@@ -27,7 +27,7 @@ def data_provider(args, flag):
         freq = args.freq
         Data = Dataset_Pred
     else:
-        shuffle_flag = False
+        shuffle_flag = True
         drop_last = True
         batch_size = args.batch_size
         freq = args.freq
@@ -43,7 +43,7 @@ def data_provider(args, flag):
         freq=freq,
         train_only=train_only
     )
-    print(flag, len(data_set))
+    # print(flag, len(data_set))
     data_loader = DataLoader(
         data_set,
         batch_size=batch_size,

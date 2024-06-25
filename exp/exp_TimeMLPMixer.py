@@ -1,6 +1,6 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear,MLPMixer
+from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear, MLPMixer, TSMixer
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric
 
@@ -33,6 +33,7 @@ class exp_TimeMLPMixer(Exp_Basic):
             'NLinear': NLinear,
             'Linear': Linear,
             'MLPMixer': MLPMixer,
+            'TSMixer': TSMixer,
         }
         model = model_dict[self.args.model].Model(self.args).float()
         # print("now model is :", model.parameters())
@@ -60,10 +61,7 @@ class exp_TimeMLPMixer(Exp_Basic):
             for i, (batch_x, batch_y, batch_x_mark, batch_y_mark) in enumerate(vali_loader):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float()
-                # print('validation batch_y.sahpe=',batch_y.shape)
-                # print('validation batch_x.sahpe=', batch_x.shape)
-                # batch_y = batch_y.reshape(16, 13, 49)
-                # batch_x = batch_x.reshape(16, 13, 49)
+
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)
 
@@ -73,9 +71,21 @@ class exp_TimeMLPMixer(Exp_Basic):
                 # encoder - decoder
                 if self.args.use_amp:
                     with torch.cuda.amp.autocast():
-                        outputs = self.model(batch_x)
+                        if 'Linear' or 'TSMixer' in self.args.model:
+                            outputs = self.model(batch_x)
+                        else:
+                            if self.args.output_attention:
+                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                            else:
+                                outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 else:
-                    outputs = self.model(batch_x)
+                    if 'Linear' in self.args.model:
+                        outputs = self.model(batch_x)
+                    else:
+                        if self.args.output_attention:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)[0]
+                        else:
+                            outputs = self.model(batch_x, batch_x_mark, dec_inp, batch_y_mark)
                 f_dim = -1 if self.args.features == 'MS' else 0
                 outputs = outputs[:, -self.args.pred_len:, f_dim:]
                 batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
@@ -95,6 +105,8 @@ class exp_TimeMLPMixer(Exp_Basic):
         if not self.args.train_only:
             vali_data, vali_loader = self._get_data(flag='val')
             test_data, test_loader = self._get_data(flag='test')
+
+
 
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
@@ -131,6 +143,8 @@ class exp_TimeMLPMixer(Exp_Basic):
 
                 # batch_y = batch_y.reshape(16, 13, 49)
                 # batch_x = batch_x.reshape(16, 13, 49)
+
+                # print('batch_x.shape is :',batch_x.shape)
 
 
                 # decoder input
@@ -225,8 +239,7 @@ class exp_TimeMLPMixer(Exp_Basic):
                 batch_x = batch_x.float().to(self.device)
                 batch_y = batch_y.float().to(self.device)
 
-                batch_y = batch_y.reshape(16, 13, 49)
-                batch_x = batch_x.reshape(16, 13, 49)
+
 
                 batch_x_mark = batch_x_mark.float().to(self.device)
                 batch_y_mark = batch_y_mark.float().to(self.device)

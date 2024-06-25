@@ -21,10 +21,10 @@ def main():
                         help='model name, options: [Autoformer, Informer, Transformer]')
 
     # data loader
-    parser.add_argument('--data', type=str, required=False, default='ETTh1', help='dataset type')
+    parser.add_argument('--data', type=str, required=False, default='custom', help='dataset type')
     parser.add_argument('--root_path', type=str, default='./data', help='root path of the data file')
     parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')
-    parser.add_argument('--features', type=str, default='M',
+    parser.add_argument('--features', type=str, default='S',
                         help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
     parser.add_argument('--target', type=str, default='Open', help='target feature in S or MS task')
     parser.add_argument('--freq', type=str, default='h',
@@ -64,8 +64,8 @@ def main():
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
     parser.add_argument('--itr', type=int, default=1, help='experiments times')
-    parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
-    parser.add_argument('--batch_size', type=int, default=8, help='batch size of train input data')
+    parser.add_argument('--train_epochs', type=int, default=1, help='train epochs')
+    parser.add_argument('--batch_size', type=int, default=16, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
     parser.add_argument('--des', type=str, default='test', help='exp description')

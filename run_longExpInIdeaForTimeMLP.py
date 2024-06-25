@@ -37,29 +37,45 @@ def main():
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
 
     # forecasting task
-    parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
+    # parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
     parser.add_argument('--label_len', type=int, default=48, help='start token length')
     parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
 
 
 
     # MLPMixer
+    parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
     parser.add_argument('--look_back_windows', type=int, default=96,
                         help='0: default 1: value embedding + temporal embedding + positional embedding 2: value embedding + temporal embedding 3: value embedding + positional embedding 4: value embedding')
     parser.add_argument('--channels', type=int, default=3,
                         help='encoder input size')  # DLinear with --individual, use this hyperparameter as the number of channels
     parser.add_argument('--number_of_values', type=int, default=7, help='decoder input size')
     parser.add_argument('--dim', type=int, default=256, help='output size')
-    parser.add_argument('--split_len', type=int, default=6, help='output size')
+    parser.add_argument('--split_len', type=int, default=48, help='output size')
     parser.add_argument('--depth', type=int, default=2, help='dimension of model')
     parser.add_argument('--predict_len', type=int, default=96, help='output size')
     parser.add_argument('--expansion_factor', type=int, default=4, help='dimension of model')
-    parser.add_argument('--expansion_factor_token', type=int, default=2, help='output size')
+    parser.add_argument('--expansion_factor_token', type=int, default=0.5, help='output size')
     parser.add_argument('--use_norm', type=int, default=True, help='use norm and denorm')
 
     # TimeMLPMixer(look_back_windows=91, channels=3, number_of_values=7, dim=128, depth=1, predict_len=7 * 7,
     #              expansion_factor=4,
     #              # #              expansion_factor_token=0.5, dropout=0.)
+
+    #txMixer
+    parser.add_argument('--sequence_length', type=int, default=512, help='input sequence length')
+    parser.add_argument('--prediction_length', type=int, default=96,
+                        help='0: default 1: value embedding + temporal embedding + positional embedding 2: value embedding + temporal embedding 3: value embedding + positional embedding 4: value embedding')
+    parser.add_argument('--input_channels', type=int, default=3,
+                        help='encoder input size')  # DLinear with --individual, use this hyperparameter as the number of channels
+    parser.add_argument('--output_channels', type=int, default=None, help='decoder input size')
+    parser.add_argument('--activation_fn', type=str, default="relu", help='output size')
+    parser.add_argument('--num_blocks', type=int, default=48, help='output size')
+    parser.add_argument('--dropout_rate', type=int, default=0.1, help='dimension of model')
+    parser.add_argument('--ff_dim', type=int, default=64, help='output size')
+    parser.add_argument('--normalize_before', type=bool, default=True, help='dimension of model')
+    parser.add_argument('--norm_type', type=str, default="batch", help='output size')
+
 
     # DLinear
     parser.add_argument('--individual', action='store_true', default=False, help='DLinear: a linear layer for each variate(channel) individually')
@@ -78,7 +94,7 @@ def main():
     parser.add_argument('--distil', action='store_false',
                         help='whether to use distilling in encoder, using this argument means not using distilling',
                         default=True)
-    parser.add_argument('--dropout', type=float, default=0.05, help='dropout')
+    parser.add_argument('--dropout', type=float, default=0.1, help='dropout')
     parser.add_argument('--embed', type=str, default='timeF',
                         help='time features encoding, options:[timeF, fixed, learned]')
     parser.add_argument('--activation', type=str, default='gelu', help='activation')
@@ -88,7 +104,7 @@ def main():
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
     parser.add_argument('--itr', type=int, default=1, help='experiments times')
-    parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
+    parser.add_argument('--train_epochs', type=int, default=30, help='train epochs')
     parser.add_argument('--batch_size', type=int, default=16, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')

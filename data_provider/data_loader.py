@@ -241,8 +241,14 @@ class Dataset_Custom(Dataset):
         num_train = int(len(df_raw) * (0.7 if not self.train_only else 1))
         num_test = int(len(df_raw) * 0.2)
         num_vali = len(df_raw) - num_train - num_test
+        # print('num_train = ',num_train)
+        # print('num_test = ', num_test)
+        # print('num_vali = ', num_vali)
+
         border1s = [0, num_train - self.seq_len, len(df_raw) - num_test - self.seq_len]
         border2s = [num_train, num_train + num_vali, len(df_raw)]
+        # print('border1s=',border1s)
+        # print('boarder2s=',border2s)
         border1 = border1s[self.set_type]
         border2 = border2s[self.set_type]
 
@@ -260,6 +266,7 @@ class Dataset_Custom(Dataset):
             # print(self.scaler.mean_)
             # exit()
             data = self.scaler.transform(df_data.values)
+            # print(type(data)) #<class 'numpy.ndarray'>
         else:
             data = df_data.values
 
@@ -282,19 +289,33 @@ class Dataset_Custom(Dataset):
     def __getitem__(self, index):
         s_begin = index
         s_end = s_begin + self.seq_len
-        r_begin = s_end - self.label_len
-        r_end = r_begin + self.label_len + self.pred_len
+        # r_begin = s_end - self.label_len
+        # r_end = r_begin + self.label_len + self.pred_len
+        r_begin = s_end
+        r_end = r_begin + self.pred_len
+        # print('s_begin=',s_begin)
+        # print('s_end=', s_end)
+        # print('r_begin=', r_begin)
+        # print('r_end=', r_end)
+
 
         seq_x = self.data_x[s_begin:s_end]
         seq_y = self.data_y[r_begin:r_end]
         seq_x_mark = self.data_stamp[s_begin:s_end]
         seq_y_mark = self.data_stamp[r_begin:r_end]
+        # print('seq_x 292 is ',seq_x.shape)
+        # print('row 292 is ', seq_y.shape)
+        # print(self.set_type)
+        # if  self.set_type == 2:
+        #     print('index = ',index)
 
         return seq_x, seq_y, seq_x_mark, seq_y_mark
 
     def __len__(self):
+        if  self.set_type == 2:
+            print('len--=',len(self.data_x) - self.seq_len - self.pred_len + 1)
+        # return len(self.data_x) - self.seq_len - self.pred_len + 1
         return len(self.data_x) - self.seq_len - self.pred_len + 1
-
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
 

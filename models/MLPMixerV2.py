@@ -19,37 +19,12 @@ class PreNormResidual(nn.Module):
     def forward(self, x):
         return self.fn(self.norm(x)) + x
 
-class TimePreNormResidual(nn.Module):
-    def __init__(self, dim, fn):
-        super(TimePreNormResidual, self).__init__()
-        self.fn = fn
-        self.norm = nn.LayerNorm(dim)
-
-    def forward(self, x):
-
-        # print('TimePreNormResidual.shape=',x.shape)
-        result = self.fn(self.norm(x)) + x
-        return result
-
-class FeaturePreNormResidual(nn.Module):
-    def __init__(self, dim, fn):
-        super(FeaturePreNormResidual, self).__init__()
-        self.fn = fn
-        self.norm = nn.LayerNorm(dim)
-
-    def forward(self, x):
-
-        x = x.permute(0, 2, 1)
-        # print('feature shape is =', x.shape)
-        result = self.fn(self.norm(x)) + x
-        return result.permute(0, 2, 1)
-
 def FeedForward(dim, expansion_factor = 4, dropout = 0., dense = nn.Linear):
     inner_dim = int(dim * expansion_factor)
     x = nn.Sequential(
         dense(dim, inner_dim),
-        nn.GELU(),
-        # nn.ReLU(),
+        # nn.GELU(),
+        nn.ReLU(),
         nn.Dropout(dropout),
         dense(inner_dim, dim),
         nn.Dropout(dropout)
@@ -99,31 +74,30 @@ class Model(nn.Module):
 
         self.split_len = config.split_len
         self.use_norm = config.use_norm
-        self.dropout = config.dropout
+        self.dropout = 0.3
 
         self.pix = self.number_of_values * self.split_len
         self.num_patches = self.look_back_windows // self.split_len
         self.chan_first, self.chan_last = partial(nn.Conv1d, kernel_size=1), nn.Linear
-        self.change_dim = nn.Linear(self.look_back_windows , self.dim) # 共享权重，时间序列我没有channel
         self.framework = nn.Sequential(
             # Rearrange('b c s ss -> b c (s ss)'),
 
             # nn.Linear((number_of_values ** 2) * channels, dim),#共享权重
-
+            nn.Linear(self.pix , self.dim),  # 共享权重，时间序列我没有channel
             *[nn.Sequential(
 
-                TimePreNormResidual(self.dim, FeedForward(self.dim, self.expansion_factor, self.dropout, self.chan_last)),##  return self.fn(self.norm(x)) + x
-                FeaturePreNormResidual(self.number_of_values, FeedForward(self.number_of_values, self.expansion_factor, self.dropout, self.chan_last))
+                PreNormResidual(self.dim, FeedForward(self.num_patches, self.expansion_factor, self.dropout, self.chan_first)),##  return self.fn(self.norm(x)) + x
+                # PreNormResidual(self.dim, FeedForward(self.dim, self.expansion_factor_token, self.dropout, self.chan_last))
 
             ) for _ in range(self.depth)],
-            # nn.LayerNorm(self.dim),
+            nn.LayerNorm(self.dim),
             # Reduce('b n c -> b c', 'mean'),
-
+            nn.Linear(self.dim, self.predict_len)
         )
-        self.final_output = nn.Linear(self.dim, self.predict_len)
+        self.final_output = nn.Linear(self.num_patches,self.number_of_values)
 
     def forward(self, x):
-        # x = x.permute(0,2,1)
+        x = x.permute(0,2,1)
         if self.use_norm:
             # Normalization from Non-stationary Transformer
             means = x.mean(1, keepdim=True).detach()
@@ -131,13 +105,13 @@ class Model(nn.Module):
             stdev = torch.sqrt(torch.var(x, dim=1, keepdim=True, unbiased=False) + 1e-5)
             x /= stdev
 
-        # x,_= splitTensor(x,self.look_back_windows,self.split_len)
-        x = self.change_dim(x.permute(0,2,1))#16,7,512
-        x = self.framework(x)
-        # print('row 137 x.shape=',x.shape)
-        x = self.final_output(x)
+        x,_= splitTensor(x,self.look_back_windows,self.split_len)
 
-        return x.permute(0,2,1)
+        x = self.framework(x)
+
+        x = self.final_output(x.permute(0,2,1))
+
+        return x
 
 
 if __name__ == '__main__':
@@ -176,7 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--number_of_values', type=int, default=7, help='decoder input size')
     parser.add_argument('--dim', type=int, default=256, help='output size')
 
-    parser.add_argument('--depth', type=int, default=1, help='dimension of model')
+    parser.add_argument('--depth', type=int, default=4, help='dimension of model')
     parser.add_argument('--predict_len', type=int, default=96, help='output size')
     parser.add_argument('--expansion_factor', type=int, default=4, help='dimension of model')
     parser.add_argument('--expansion_factor_token', type=int, default=0.5, help='output size')
@@ -240,13 +214,11 @@ if __name__ == '__main__':
 
     print(args)
 
-    matrix = torch.arange(1., 10753.).reshape(16, 96, 7)
+    matrix = torch.arange(1., 10753.).reshape(16, 7, 96)
     print("原始矩阵:")
     print(matrix.shape)
 
     mixer = Model(args)
-
-    print(mixer)
 
     y = mixer(matrix)
 
