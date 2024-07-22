@@ -56,9 +56,13 @@ class Model(nn.Module):
         self.decompsition = series_decomp(self.kernel_size)
         self.batch_norm = nn.BatchNorm1d(self.input_size)
 
+        # 定义一个卷积层，将输入的通道数从 7 变为 6
+        self.conv_layer = nn.Conv2d(in_channels=11, out_channels=6, kernel_size=3, padding=1)
+
     def handle(self,x):
-        x = x.unfold(dimension=1, size=16, step=16)
-        x = x.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
+        orig = x
+        # print('x.shape=',x.shape)
+
 
         # 定义线性变换
         linear1 = nn.Linear(7, 28)  # 16,6,16,7
@@ -92,26 +96,41 @@ class Model(nn.Module):
 
         # 获取张量的原始维度
         a, b, c, d = x.shape
-        x = x.reshape(a, b * c, d)
 
-        return x  # xigzhou read log : [batch_size,pre_dict_len,number of values]
+        # print(a)
+        # print(b)
+        # print(c)
+        # print(d)
+
+        # x = x.reshape(a, b * c, d)
+
+        return x+orig  # xigzhou read log : [batch_size,pre_dict_len,number of values]
 
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         # global seasonal_init_row_connect, trend_init_row_connect, mul_connection, diff_row_connection
         seasonal_init, trend_init = self.decompsition(x)
 
-        seasonal_init_x = self.handle(seasonal_init)
-        trend_init_x = self.handle(trend_init)
+        print(seasonal_init.shape)
+
+        #切片
+        x_s = seasonal_init.unfold(dimension=1, size=16, step=6)
+        x_s = x_s.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
+        #切片
+        x_t = trend_init.unfold(dimension=1, size=16, step=6)
+        x_t = x_t.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
 
         for i in range(10):
-            seasonal_init_x = self.handle(seasonal_init+seasonal_init_x)
-            trend_init_x = self.handle(trend_init+trend_init_x)
+            x_s = self.handle(x_s)
+            x_t = self.handle(x_t)
 
 
 
 
-        x = seasonal_init_x+trend_init_x
+        x = x_s+x_t
         # x = seasonal_init
+
+        a, b, c, d = x.shape
+        x = x.reshape(a, b * c, d)
 
         return x  # xigzhou read log : [batch_size,pre_dict_len,number of values]
