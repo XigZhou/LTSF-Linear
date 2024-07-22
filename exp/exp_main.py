@@ -1,6 +1,6 @@
 from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
-from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear
+from models import Informer, Autoformer, Transformer, DLinear, Linear, NLinear, TLinear
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric
 
@@ -31,6 +31,7 @@ class Exp_Main(Exp_Basic):
             'DLinear': DLinear,
             'NLinear': NLinear,
             'Linear': Linear,
+            'TLinear': TLinear,
         }
         model = model_dict[self.args.model].Model(self.args).float()
 
@@ -377,7 +378,10 @@ class Exp_Main(Exp_Basic):
         preds = np.array(preds)
         preds = np.concatenate(preds, axis=0)
         if (pred_data.scale):
-            preds = pred_data.inverse_transform(preds)
+            #bug fix for predict @xigzhou
+            preds = preds.reshape(preds.shape[0],-1)
+
+            preds = pred_data.inverse_transform(preds) # 转化为标准化之前的数据
         
         # result save
         folder_path = './results/' + setting + '/'

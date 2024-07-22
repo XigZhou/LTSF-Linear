@@ -1,10 +1,11 @@
 import argparse
+import datetime
 import os
 import torch
 from exp.exp_main import Exp_Main
 import random
 import numpy as np
-
+from datetime import datetime
 def main():
     fix_seed = 2021
     random.seed(fix_seed)
@@ -16,15 +17,15 @@ def main():
     # basic config
     parser.add_argument('--is_training', type=int, required=False, default=1, help='status')
     parser.add_argument('--train_only', type=bool, required=False, default=False, help='perform training on full input dataset without validation and testing')
-    parser.add_argument('--model_id', type=str, required=False, default='TSLA_96', help='model id')
-    parser.add_argument('--model', type=str, required=False, default='DLinear',
-                        help='model name, options: [Autoformer, Informer, Transformer]')
+    parser.add_argument('--model_id', type=str, required=False, default='ETTh1_96_10blockv2', help='model id')
+    parser.add_argument('--model', type=str, required=False, default='TLinear',
+                        help='model name, options: [Autoformer, Informer, Transformer,DLinear]')
 
     # data loader
-    parser.add_argument('--data', type=str, required=False, default='custom', help='dataset type')
+    parser.add_argument('--data', type=str, required=False, default='ETTh1', help='dataset type')
     parser.add_argument('--root_path', type=str, default='./data', help='root path of the data file')
-    parser.add_argument('--data_path', type=str, default='TSLA.csv', help='data file')
-    parser.add_argument('--features', type=str, default='S',
+    parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')
+    parser.add_argument('--features', type=str, default='M',
                         help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
     parser.add_argument('--target', type=str, default='Open', help='target feature in S or MS task')
     parser.add_argument('--freq', type=str, default='h',
@@ -32,9 +33,9 @@ def main():
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
 
     # forecasting task
-    parser.add_argument('--seq_len', type=int, default=16, help='input sequence length')
-    parser.add_argument('--label_len', type=int, default=48, help='start token length')
-    parser.add_argument('--pred_len', type=int, default=16, help='prediction sequence length')
+    parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
+    parser.add_argument('--label_len', type=int, default=0, help='start token length')
+    parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
 
 
     # DLinear
@@ -44,12 +45,12 @@ def main():
     parser.add_argument('--enc_in', type=int, default=21, help='encoder input size') # DLinear with --individual, use this hyperparameter as the number of channels
     parser.add_argument('--dec_in', type=int, default=21, help='decoder input size')
     parser.add_argument('--c_out', type=int, default=7, help='output size')
-    parser.add_argument('--d_model', type=int, default=128, help='dimension of model')
+    parser.add_argument('--d_model', type=int, default=256, help='dimension of model')
     parser.add_argument('--n_heads', type=int, default=8, help='num of heads')
     parser.add_argument('--e_layers', type=int, default=2, help='num of encoder layers')
     parser.add_argument('--d_layers', type=int, default=1, help='num of decoder layers')
-    parser.add_argument('--d_ff', type=int, default=1024, help='dimension of fcn')
-    parser.add_argument('--moving_avg', type=int, default=25, help='window size of moving average')
+    parser.add_argument('--d_ff', type=int, default=512, help='dimension of fcn')
+    parser.add_argument('--moving_avg', type=int, default=256, help='window size of moving average')
     parser.add_argument('--factor', type=int, default=1, help='attn factor')
     parser.add_argument('--distil', action='store_false',
                         help='whether to use distilling in encoder, using this argument means not using distilling',
@@ -64,7 +65,7 @@ def main():
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
     parser.add_argument('--itr', type=int, default=1, help='experiments times')
-    parser.add_argument('--train_epochs', type=int, default=20, help='train epochs')
+    parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
     parser.add_argument('--batch_size', type=int, default=8, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
@@ -94,6 +95,8 @@ def main():
     print(args)
 
     Exp = Exp_Main
+
+    print(datetime.now())
 
     if args.is_training:
         for ii in range(args.itr):
@@ -157,7 +160,7 @@ def main():
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
             exp.test(setting, test=1)
         torch.cuda.empty_cache()
-
+        print(datetime.now())
 
 if __name__ == '__main__':
     main()

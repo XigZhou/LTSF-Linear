@@ -18,7 +18,7 @@ def main():
     parser.add_argument('--train_only', type=bool, required=False, default=False, help='perform training on full input dataset without validation and testing')
     parser.add_argument('--model_id', type=str, required=False, default='ETTh1_96', help='model id')
     parser.add_argument('--model', type=str, required=False, default='DLinear',
-                        help='model name, options: [Autoformer, Informer, Transformer]')
+                        help='model name, options: [Autoformer, Informer, Transformer,DLinear]')
 
     # data loader
     parser.add_argument('--data', type=str, required=False, default='ETTh1', help='dataset type')
