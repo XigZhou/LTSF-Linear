@@ -111,7 +111,7 @@ class Model(nn.Module):
         # global seasonal_init_row_connect, trend_init_row_connect, mul_connection, diff_row_connection
         seasonal_init, trend_init = self.decompsition(x)
 
-        print(seasonal_init.shape)
+
 
         #切片
         x_s = seasonal_init.unfold(dimension=1, size=16, step=6)
