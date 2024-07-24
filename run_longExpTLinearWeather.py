@@ -17,14 +17,14 @@ def main():
     # basic config
     parser.add_argument('--is_training', type=int, required=False, default=1, help='status')
     parser.add_argument('--train_only', type=bool, required=False, default=False, help='perform training on full input dataset without validation and testing')
-    parser.add_argument('--model_id', type=str, required=False, default='ETTh1_96_10blockv2', help='model id')
+    parser.add_argument('--model_id', type=str, required=False, default='weather_366_10blockv2', help='model id')
     parser.add_argument('--model', type=str, required=False, default='TLinear',
                         help='model name, options: [Autoformer, Informer, Transformer,DLinear]')
 
     # data loader
-    parser.add_argument('--data', type=str, required=False, default='ETTh1', help='dataset type')
+    parser.add_argument('--data', type=str, required=False, default='custom', help='dataset type')
     parser.add_argument('--root_path', type=str, default='./data', help='root path of the data file')
-    parser.add_argument('--data_path', type=str, default='ETTh1.csv', help='data file')
+    parser.add_argument('--data_path', type=str, default='weather.csv', help='data file')
     parser.add_argument('--features', type=str, default='M',
                         help='forecasting task, options:[M, S, MS]; M:multivariate predict multivariate, S:univariate predict univariate, MS:multivariate predict univariate')
     parser.add_argument('--target', type=str, default='Open', help='target feature in S or MS task')
@@ -33,12 +33,12 @@ def main():
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
 
     # forecasting task
-    parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
+    parser.add_argument('--seq_len', type=int, default=336, help='input sequence length')
     parser.add_argument('--label_len', type=int, default=0, help='start token length')
-    parser.add_argument('--pred_len', type=int, default=96, help='prediction sequence length')
+    parser.add_argument('--pred_len', type=int, default=336, help='prediction sequence length')
 
     #TLinear
-    parser.add_argument('--input_size', type=int, default=7, help='input sequence length')
+    parser.add_argument('--input_size', type=int, default=21, help='input sequence length')
     parser.add_argument('--dim', type=int, default=512, help='start token length')
     parser.add_argument('--hidden_size', type=int, default=256, help='prediction sequence length')
     parser.add_argument('--depth', type=int, default=10, help='input sequence length')
@@ -46,8 +46,8 @@ def main():
     parser.add_argument('--con1d_kernel_size', type=int, default=3, help='prediction sequence length')
     parser.add_argument('--con1d_stride', type=int, default=1, help='prediction sequence length')
     parser.add_argument('--con1d_padding', type=int, default=1, help='prediction sequence length')
-    parser.add_argument('--patch_num', type=int, default=6, help='prediction sequence length')
-    parser.add_argument('--patch_len', type=int, default=16, help='prediction sequence length')
+    parser.add_argument('--patch_num', type=int, default=16, help='prediction sequence length')
+    parser.add_argument('--patch_len', type=int, default=21, help='prediction sequence length')
 
 
     # DLinear
@@ -77,8 +77,8 @@ def main():
     # optimization
     parser.add_argument('--num_workers', type=int, default=10, help='data loader num workers')
     parser.add_argument('--itr', type=int, default=1, help='experiments times')
-    parser.add_argument('--train_epochs', type=int, default=3, help='train epochs')
-    parser.add_argument('--batch_size', type=int, default=16, help='batch size of train input data')
+    parser.add_argument('--train_epochs', type=int, default=10, help='train epochs')
+    parser.add_argument('--batch_size', type=int, default=32, help='batch size of train input data')
     parser.add_argument('--patience', type=int, default=20, help='early stopping patience')
     parser.add_argument('--learning_rate', type=float, default=0.0001, help='optimizer learning rate')
     parser.add_argument('--des', type=str, default='test', help='exp description')

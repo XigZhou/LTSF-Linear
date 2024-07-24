@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+torch.autograd.set_detect_anomaly(True)
+
 
 class moving_avg(nn.Module):
     """
@@ -39,107 +41,129 @@ class series_decomp(nn.Module):
         return res, moving_mean
 
 
+class MixerBlock(nn.Module):
+    def __init__(self, input_size, patch_len, dim, hidden_size, dropout=0.):
+        super().__init__()
+
+        self.patch_mix = nn.Sequential(
+            nn.Linear(input_size * patch_len, dim),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(dim, input_size * patch_len),
+            nn.ReLU(),
+            nn.Dropout(0.2)
+
+        )
+
+    def forward(self, x):
+        x = x + self.patch_mix(x)
+
+        return x
+
+
+class PatchBlock(nn.Module):
+    def __init__(self, patch_num, selective_channel_dim, con1d_stride, con1d_kernel_size, con1d_padding):
+        super().__init__()
+
+        self.patch_mix = nn.Sequential(
+            nn.Conv1d(in_channels=patch_num, out_channels=selective_channel_dim,
+                      stride=con1d_stride, kernel_size=con1d_kernel_size, padding=con1d_padding),
+            nn.Conv1d(in_channels=selective_channel_dim, out_channels=patch_num,
+                      stride=con1d_stride, kernel_size=con1d_kernel_size, padding=con1d_padding),
+
+        )
+
+    def forward(self, x):
+        x = x + self.patch_mix(x)
+
+        return x
+
+
 class Model(nn.Module):
     """
     Decomposition-Linear
     """
 
-    def __init__(self,config):
+    def __init__(self, config):
         super(Model, self).__init__()
         # 16,6,16,7 ----> 6,16,7
         self.input_size = 7
-        self.dim = 28
-        self.hidden_size = 2 * self.input_size
-        self.rnn = nn.RNN(self.input_size, self.hidden_size, batch_first=True)
+
+        self.dim = 512
+        self.hidden_size = 256
+        self.depth = 10
+
         self.fc = nn.Linear(self.hidden_size, self.input_size)
         # Decompsition Kernel Size
         self.kernel_size = 25
+
+        self.con1d_kernel_size = 3
+        self.con1d_stride = 1
+        self.con1d_padding = 1
+
         self.decompsition = series_decomp(self.kernel_size)
         self.patch_num = 6
-        self.patch_block_layers = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(self.input_size, self.dim),
-                    nn.ReLU(),
-                    nn.Linear(self.dim, self.hidden_size),
-                    self.rnn(self.input_size, self.hidden_size, batch_first=True)
-                )
-            ]
+        self.patch_len = 16
+
+        self.selective_channel_dim = self.patch_len * 2
+
+        self.mixer_blocks = nn.ModuleList([])
+        self.patch_blocks = nn.ModuleList([])
+
+        for _ in range(self.depth):
+            self.mixer_blocks.append(MixerBlock(self.input_size, self.patch_len, self.dim, self.hidden_size))
+
+        for _ in range(self.depth):
+            self.patch_blocks.append(
+                PatchBlock(self.patch_num, self.selective_channel_dim, self.con1d_stride, self.con1d_kernel_size,
+                           self.con1d_padding))
+
+        self.predictBlock = nn.Sequential(
+            nn.Linear(self.input_size * self.patch_len, self.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(self.hidden_size, self.input_size * self.patch_len)
         )
+        # self.predict = nn.Linear(self.input_size*self.patch_len, self.ihidden_size)
+        # self.RELU = nn.RELU()
+        # self.DROP = nn.Dropout(0.2)
+        # self.predict = nn.Linear(self.hidden_size, self.input_size * self.patch_len)
 
-
-    def handle(self,x):
-        orig = x
-        # print('x.shape=',x.shape)
-
-
-        # 定义线性变换
-        linear1 = nn.Linear(7, 28)  # 16,6,16,7
-        linear2 = nn.Linear(28, 7)  # 16,6,16,7
-
-        # 定义激活函数（例如ReLU）
-        activation = nn.ReLU()
-        drop_out = nn.Dropout(0.3)
-        # print(x.shape)
-        # 对最后一维做线性变换并应用激活函数
-        x = activation(linear1(x))
-        x = drop_out(x)
-        x = activation(linear2(x))
-        x = drop_out(x)
-
-        for i in range(x.size(0)):
-            # 提取第 i 个切片在第一个维度的所有数据
-            slice_tensor = x[i]
-            output, _ = self.rnn(slice_tensor)
-            #             print('output.shape=',output.shape)#output.shape= torch.Size([6, 16, 6])
-            output = self.fc(output)
-            # print('output.shape=',output.shape)#output.shape= torch.Size([6, 16, 7])
-
-            # 将更新后的 output 存回 x
-            # output = output.view(-1, 7)
-            # output = self.batch_norm(output)
-            # output = output.view(6, 16, 7)
-            x[i] = output
-
-        # print('after handle x=', x.shape)
-
-        # 获取张量的原始维度
-        a, b, c, d = x.shape
-
-        # print(a)
-        # print(b)
-        # print(c)
-        # print(d)
-
-        # x = x.reshape(a, b * c, d)
-
-        return x+orig  # xigzhou read log : [batch_size,pre_dict_len,number of values]
+        self.rnn = nn.RNN(self.input_size, self.hidden_size, batch_first=True)
 
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         # global seasonal_init_row_connect, trend_init_row_connect, mul_connection, diff_row_connection
         seasonal_init, trend_init = self.decompsition(x)
+        # 切片
 
-
-
-        #切片
-        x_s = seasonal_init.unfold(dimension=1, size=16, step=6)
+        x_s = seasonal_init.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
         x_s = x_s.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
-        #切片
-        x_t = trend_init.unfold(dimension=1, size=16, step=6)
+        x_s = x_s.reshape(x_s.size(0), self.patch_num, self.input_size * self.patch_len)
+        # 切片
+
+        x_t = trend_init.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
         x_t = x_t.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
+        x_t = x_t.reshape(x_t.size(0), self.patch_num, self.input_size * self.patch_len)
 
-        for i in range(10):
-            x_s = self.handle(x_s)
-            x_t = self.handle(x_t)
+        # x_s=self.mixer_blocks(x_s)
+        # x_s = self.patch_blocks(x_s)
+        #
+        # x_t =self.mixer_blocks(x_t)
+        # x_t = self.patch_blocks(x_t)
 
+        for mixer_block in self.mixer_blocks:
+            x_s = mixer_block(x_s)
+            x_t = mixer_block(x_t)
+        for patch_block in self.patch_blocks:
+            x_s = patch_block(x_s)
+            x_t = patch_block(x_t)
 
-
-
-        x = x_s+x_t
+        x = x_s + x_t
         # x = seasonal_init
+        x = self.predictBlock(x)
 
-        a, b, c, d = x.shape
-        x = x.reshape(a, b * c, d)
+        # a, b, c, d = x.shape
+        x = x.reshape(x.size(0), self.patch_num * self.patch_len, self.input_size)
 
         return x  # xigzhou read log : [batch_size,pre_dict_len,number of values]

@@ -40,6 +40,55 @@ class series_decomp(nn.Module):
         return res, moving_mean
 
 
+class MLPBlock(nn.Module):
+    def __init__(self, input_size, patch_len, dim, hidden_size, patch_num, selective_channel_dim, con1d_stride, con1d_kernel_size, con1d_padding):
+        super().__init__()
+
+        self.norm = nn.LayerNorm(hidden_size)
+
+        self.mlp_mix = nn.Sequential(
+            nn.Linear(input_size * patch_len, dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            # nn.Linear(dim, input_size * patch_len),
+            nn.Linear(dim, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.3)
+
+        )
+
+        self.patch_mix = nn.Sequential(
+            nn.Conv1d(in_channels=patch_num, out_channels=selective_channel_dim,
+                      stride=con1d_stride, kernel_size=con1d_kernel_size, padding=con1d_padding),
+            nn.Conv1d(in_channels=selective_channel_dim, out_channels=patch_num,
+                      stride=con1d_stride, kernel_size=con1d_kernel_size, padding=con1d_padding),
+
+        )
+
+
+
+    def forward(self, x):
+
+        # x = x + self.mlp_mix(x)
+        # x = self.norm(x)
+        # x = x + self.patch_mix(x)
+        # x = self.norm(x)
+        # return x
+        # x = self.norm(x+self.mlp_mix(x))
+
+        x = self.norm(x + self.patch_mix(x))
+        return x
+
+
+class PreNormResidual(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.fn = fn
+        self.norm = nn.LayerNorm(dim)
+
+    def forward(self, x):
+
+        return self.fn(self.norm(x)) + x
 class Model(nn.Module):
     """
     Decomposition-Linear
@@ -47,132 +96,108 @@ class Model(nn.Module):
     def __init__(self,config):
         super(Model, self).__init__()
         # 16,6,16,7 ----> 6,16,7
-        self.input_size = 7
+        self.input_size = config.input_size
 
-        self.dim = 28
-        self.hidden_size = 2 * self.input_size
+        self.dim = config.dim
+        self.hidden_size = config.hidden_size
+        self.depth = config.depth
 
         self.fc = nn.Linear(self.hidden_size, self.input_size)
         # Decompsition Kernel Size
-        self.kernel_size = 25
+        self.kernel_size = config.kernel_size
 
-        self.con1d_kernel_size = 3
-        self.con1d_stride = 1
-        self.con1d_padding = 1
+        self.con1d_kernel_size = config.con1d_kernel_size
+        self.con1d_stride = config.con1d_stride
+        self.con1d_padding = config.con1d_padding
 
         self.decompsition = series_decomp(self.kernel_size)
-        self.patch_num = 6
-        self.patch_len = 16
+        self.patch_num = config.patch_num
+        self.patch_len = config.patch_len
 
         self.selective_channel_dim =self.patch_len*2
 
+        self.mixer_blocks = nn.ModuleList([])
+        self.patch_blocks = nn.ModuleList([])
 
-        self.MLP_block = nn.Sequential(
-                    nn.Linear(self.input_size, self.dim),
-                    nn.ReLU(),
-                    nn.Dropout(0.1),
-                    nn.Linear(self.dim, self.hidden_size),
-                    nn.Dropout(0.1)
-                )
+        # for _ in range(self.depth):
+        #     self.mixer_blocks.append(MixerBlock(self.input_size, self.patch_len, self.dim, self.hidden_size))
+        for _ in range(self.depth):
+            self.mixer_blocks.append(MLPBlock(self.input_size, self.patch_len, self.dim, self.hidden_size,self.patch_num, self.selective_channel_dim, self.con1d_stride, self.con1d_kernel_size,
+                           self.con1d_padding))
 
-        self.n1 = nn.Conv1d(in_channels=self.patch_len, out_channels=self.selective_channel_dim,
-                  stride=self.con1d_stride, kernel_size=self.con1d_kernel_size, padding=self.con1d_padding)
-        self.n2 = nn.Conv1d(in_channels=self.selective_channel_dim, out_channels=self.patch_len,
-                  stride=self.con1d_stride, kernel_size=self.con1d_kernel_size, padding=self.con1d_padding)
-        self.n3 = nn.Linear(self.hidden_size, self.input_size)
-        self.n4 = nn.ReLU()
-        self.n5 = nn.Dropout(0.1)
+        for _ in range(self.depth):
+            self.patch_blocks.append(MLPBlock(self.input_size, self.patch_len, self.dim, self.hidden_size,self.patch_num, self.selective_channel_dim, self.con1d_stride, self.con1d_kernel_size,
+                           self.con1d_padding))
+
+        self.predictBlock = nn.Sequential(
+            nn.Linear(self.input_size * self.patch_len, self.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(self.hidden_size, self.input_size * self.patch_len)
+        )
+        self.predictFN = nn.Linear(self.hidden_size, self.input_size * self.patch_len)
+        self.mlp_mix = nn.Sequential(
+            nn.Linear(self.input_size * self.patch_len, self.dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            # nn.Linear(dim, input_size * patch_len),
+            nn.Linear(self.dim, self.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.3)
+
+        )
+        self.mlp_mix1 = nn.Sequential(
+            nn.Linear(self.input_size * self.patch_len, self.dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            # nn.Linear(dim, input_size * patch_len),
+            nn.Linear(self.dim, self.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(0.3)
+
+        )
 
 
         self.rnn = nn.RNN(self.input_size , self.hidden_size, batch_first=True)
 
-    def handle(self,x):
 
-
-
-        # for i in range(x.size(0)):
-        #     # 提取第 i 个切片在第一个维度的所有数据
-
-        slice_input = x
-
-
-        slice_input = self.n2(self.n1(x))
-
-
-
-        # slice_input = self.n3(slice_input)
-        # print('n3=', slice_input.shape)
-        # slice_input = self.n4(slice_input)
-        # print('n4=', slice_input.shape)
-        # slice_input = self.n5(slice_input)
-        # print('n5=', slice_input.shape)
-        # x = self.selective_patch_info(x)
-
-        return x+slice_input  # xigzhou read log : [batch_size,pre_dict_len,number of values]
-
-    # def forward(self, x):
-    #     # x: [Batch, Input length, Channel]
-    #     # global seasonal_init_row_connect, trend_init_row_connect, mul_connection, diff_row_connection
-    #     seasonal_init, trend_init = self.decompsition(x)
-    #     #切片
-    #     x_s = self.MLP_block(seasonal_init)
-    #     print('x_s=',x_s.shape)
-    #     x_s = x_s.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
-    #     # z.unfold(dimension=-1, size=self.patch_len, step=self.stride)
-    #     print('x_s2=', x_s.shape)
-    #     x_s = x_s.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
-    #     print('x_s=', x_s.shape)
-    #     #切片
-    #     x_t = self.MLP_block(trend_init)
-    #     x_t = x_t.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
-    #     x_t = x_t.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
-    #
-    #     for i in range(x_s.size(0)):
-    #
-    #         x_s[i] = self.handle(x_s[i])
-    #     for i in range(x_t.size(0)):
-    #         x_t[i] = self.handle(x_t[i])
-    #
-    #     x = x_s+x_t
-    #     # x = seasonal_init
-    #
-    #     print('reshape v before,', x.shape)
-    #     a, b, c, d = x.shape
-    #     x = x.reshape(a, b * c, d)
-    #     print('reshape before,',x.shape)
-    #     x = self.n3(x)
-    #     print('reshape after,', x.shape)
-    #     return x  # xigzhou read log : [batch_size,pre_dict_len,number of values]
     def forward(self, x):
         # x: [Batch, Input length, Channel]
         # global seasonal_init_row_connect, trend_init_row_connect, mul_connection, diff_row_connection
         seasonal_init, trend_init = self.decompsition(x)
         #切片
-        x_s = self.MLP_block(seasonal_init)
-        print('x_s=',x_s.shape)
-        x_s = x_s.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
-        # z.unfold(dimension=-1, size=self.patch_len, step=self.stride)
-        print('x_s2=', x_s.shape)
+
+        x_s = seasonal_init.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
         x_s = x_s.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
-        print('x_s=', x_s.shape)
+        x_s = x_s.reshape(x_s.size(0), self.patch_num, self.input_size * self.patch_len)
         #切片
-        x_t = self.MLP_block(trend_init)
-        x_t = x_t.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
+
+        x_t = trend_init.unfold(dimension=1, size=self.patch_len, step=self.patch_len)
         x_t = x_t.permute(0, 1, 3, 2)  # x: [Batch, Input length, Channel] -----> [Batch, Patch num, Patch len, Channel]
+        x_t = x_t.reshape(x_t.size(0),self.patch_num,self.input_size*self.patch_len)
 
-        for i in range(x_s.size(0)):
+        x_s = self.mlp_mix(x_s)
+        x_t = self.mlp_mix1(x_t)
 
-            x_s[i] = self.handle(x_s[i])
-        for i in range(x_t.size(0)):
-            x_t[i] = self.handle(x_t[i])
+        for mixer_block in self.mixer_blocks:
+            x_s = mixer_block(x_s)
+
+        for patch_block in self.patch_blocks:
+
+            x_t = patch_block(x_t)
 
         x = x_s+x_t
         # x = seasonal_init
+        x = self.predictFN(x)
 
-        print('reshape v before,', x.shape)
-        a, b, c, d = x.shape
-        x = x.reshape(a, b * c, d)
-        print('reshape before,',x.shape)
-        x = self.n3(x)
-        print('reshape after,', x.shape)
+        # a, b, c, d = x.shape
+        x = x.reshape(x.size(0),self.patch_num*self.patch_len,self.input_size)
+
         return x  # xigzhou read log : [batch_size,pre_dict_len,number of values]
+
+
+if __name__ == '__main__':
+    con1d = nn.Conv1d(in_channels=6, out_channels=12,
+              stride=1, kernel_size=3,padding=1)
+    a = torch.rand(16, 6, 256)
+    print(con1d(a).shape)
